@@ -21,8 +21,13 @@ public class BallController : MonoBehaviour
     [SerializeField] private float shootForce = 10f;
     [SerializeField] private float recaptureCooldown = 0.2f;
 
+    [Header("Passing")]
+    [SerializeField] private float passForce = 8f;
+    [SerializeField] private float maxPassMissAngle = 25f;
+
     [Header("References")]
-    [SerializeField] private Transform playerTransform;
+    [SerializeField] private PlayerControlManager controlManager;
+    [SerializeField] private PlayerMovement2D[] players;
 
     private Rigidbody2D rb;
     private Transform currentOwner;
@@ -35,6 +40,7 @@ public class BallController : MonoBehaviour
 
     public BallState CurrentState => currentState;
     public Transform CurrentOwner => currentOwner;
+    public Vector2 BallPosition => transform.position;
 
     private void Awake()
     {
@@ -57,6 +63,7 @@ public class BallController : MonoBehaviour
         {
             CheckForTurnLoss();
             CheckForShoot();
+            CheckForPass();
         }
     }
 
@@ -73,14 +80,31 @@ public class BallController : MonoBehaviour
         if (recaptureTimer > 0f)
             return;
 
-        if (playerTransform == null)
+        if (players == null || players.Length == 0)
             return;
 
-        float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
+        PlayerMovement2D bestCandidate = null;
+        float bestDistance = float.MaxValue;
 
-        if (distanceToPlayer <= controlRadius)
+        for (int i = 0; i < players.Length; i++)
         {
-            CaptureBall(playerTransform);
+            PlayerMovement2D player = players[i];
+
+            if (player == null)
+                continue;
+
+            float distance = Vector2.Distance(transform.position, player.transform.position);
+
+            if (distance <= controlRadius && distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestCandidate = player;
+            }
+        }
+
+        if (bestCandidate != null)
+        {
+            CaptureBall(bestCandidate.transform);
         }
     }
 
@@ -102,6 +126,12 @@ public class BallController : MonoBehaviour
                 lastMoveDirection = moveInput.normalized;
             else
                 lastMoveDirection = currentOwnerMovement.FacingDirection.normalized;
+
+            if (controlManager != null &&
+                controlManager.CurrentControlledPlayer != currentOwnerMovement)
+            {
+                controlManager.SetControlledPlayer(currentOwnerMovement);
+            }
         }
 
         currentControlOffset = baseControlOffset;
@@ -220,6 +250,60 @@ public class BallController : MonoBehaviour
 
         rb.simulated = true;
         rb.linearVelocity = shootDirection * shootForce;
+
+        recaptureTimer = recaptureCooldown;
+        turnCheckReady = false;
+    }
+
+    private void CheckForPass()
+    {
+        if (currentOwnerMovement == null)
+            return;
+
+        if (currentOwnerMovement.ConsumePassRequest())
+        {
+            PassBall();
+        }
+    }
+
+    private void PassBall()
+    {
+        if (currentOwnerMovement == null)
+            return;
+
+        Vector2 passDirection = currentOwnerMovement.FacingDirection.normalized;
+        Vector2 finalDirection = ApplyPassInaccuracy(passDirection, currentOwnerMovement.passing);
+
+        ReleaseBall(finalDirection * passForce);
+    }
+
+    private Vector2 ApplyPassInaccuracy(Vector2 idealDirection, float passingStat)
+    {
+        float accuracy01 = Mathf.Clamp01(passingStat / 100f);
+        float missAngle = Mathf.Lerp(maxPassMissAngle, 0f, accuracy01);
+
+        float randomAngle = Random.Range(-missAngle, missAngle);
+        float radians = randomAngle * Mathf.Deg2Rad;
+
+        float cos = Mathf.Cos(radians);
+        float sin = Mathf.Sin(radians);
+
+        Vector2 rotated = new Vector2(
+            idealDirection.x * cos - idealDirection.y * sin,
+            idealDirection.x * sin + idealDirection.y * cos
+        );
+
+        return rotated.normalized;
+    }
+
+    private void ReleaseBall(Vector2 velocity)
+    {
+        currentOwner = null;
+        currentOwnerMovement = null;
+        currentState = BallState.Free;
+
+        rb.simulated = true;
+        rb.linearVelocity = velocity;
 
         recaptureTimer = recaptureCooldown;
         turnCheckReady = false;
