@@ -9,9 +9,21 @@ public class PlayerControlManager : MonoBehaviour
     private PlayerMovement2D currentControlledPlayer;
 
     public PlayerMovement2D CurrentControlledPlayer => currentControlledPlayer;
+    public PlayerMovement2D[] ControllablePlayers => controllablePlayers;
 
     private void Start()
     {
+        if (controllablePlayers != null)
+        {
+            for (int i = 0; i < controllablePlayers.Length; i++)
+            {
+                if (controllablePlayers[i] != null)
+                {
+                    controllablePlayers[i].SetControlled(false);
+                }
+            }
+        }
+
         if (startingPlayer != null)
         {
             SetControlledPlayer(startingPlayer);
@@ -60,7 +72,7 @@ public class PlayerControlManager : MonoBehaviour
         if (controllablePlayers == null || controllablePlayers.Length == 0)
             return false;
 
-        Vector2 ballPosition = ballController.BallPosition;
+        Vector2 ballPosition = ballController.transform.position;
 
         PlayerMovement2D closestPlayer = null;
         PlayerMovement2D secondClosestPlayer = null;

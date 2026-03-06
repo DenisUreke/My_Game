@@ -25,9 +25,12 @@ public class BallController : MonoBehaviour
     [SerializeField] private float passForce = 8f;
     [SerializeField] private float maxPassMissAngle = 25f;
 
+    [Header("Pass Targeting")]
+    [SerializeField] private float passTargetMaxAngle = 35f;
+    [SerializeField] private float passTargetMaxDistance = 10f;
+
     [Header("References")]
     [SerializeField] private PlayerControlManager controlManager;
-    [SerializeField] private PlayerMovement2D[] players;
 
     private Rigidbody2D rb;
     private Transform currentOwner;
@@ -40,7 +43,6 @@ public class BallController : MonoBehaviour
 
     public BallState CurrentState => currentState;
     public Transform CurrentOwner => currentOwner;
-    public Vector2 BallPosition => transform.position;
 
     private void Awake()
     {
@@ -79,6 +81,11 @@ public class BallController : MonoBehaviour
     {
         if (recaptureTimer > 0f)
             return;
+
+        if (controlManager == null)
+            return;
+
+        PlayerMovement2D[] players = controlManager.ControllablePlayers;
 
         if (players == null || players.Length == 0)
             return;
@@ -271,10 +278,73 @@ public class BallController : MonoBehaviour
         if (currentOwnerMovement == null)
             return;
 
-        Vector2 passDirection = currentOwnerMovement.FacingDirection.normalized;
-        Vector2 finalDirection = ApplyPassInaccuracy(passDirection, currentOwnerMovement.passing);
+        Vector2 facingDirection = currentOwnerMovement.FacingDirection.normalized;
+        PlayerMovement2D targetPlayer = FindBestPassTarget(facingDirection);
 
+        Vector2 passDirection;
+
+        if (targetPlayer != null)
+        {
+            passDirection = ((Vector2)targetPlayer.transform.position - (Vector2)transform.position).normalized;
+        }
+        else
+        {
+            passDirection = facingDirection;
+        }
+
+        Vector2 finalDirection = ApplyPassInaccuracy(passDirection, currentOwnerMovement.passing);
         ReleaseBall(finalDirection * passForce);
+    }
+
+    private PlayerMovement2D FindBestPassTarget(Vector2 facingDirection)
+    {
+        if (controlManager == null)
+            return null;
+
+        PlayerMovement2D[] players = controlManager.ControllablePlayers;
+
+        if (players == null || players.Length == 0 || currentOwnerMovement == null)
+            return null;
+
+        PlayerMovement2D bestTarget = null;
+        float bestScore = -999f;
+
+        float maxDotOffset = Mathf.Cos(passTargetMaxAngle * Mathf.Deg2Rad);
+        Vector2 origin = currentOwnerMovement.transform.position;
+
+        for (int i = 0; i < players.Length; i++)
+        {
+            PlayerMovement2D candidate = players[i];
+
+            if (candidate == null)
+                continue;
+
+            if (candidate == currentOwnerMovement)
+                continue;
+
+            Vector2 toCandidate = (Vector2)candidate.transform.position - origin;
+            float distance = toCandidate.magnitude;
+
+            if (distance > passTargetMaxDistance || distance < 0.01f)
+                continue;
+
+            Vector2 dirToCandidate = toCandidate.normalized;
+            float dot = Vector2.Dot(facingDirection, dirToCandidate);
+
+            if (dot < maxDotOffset)
+                continue;
+
+            // Prefer players closer to the facing direction, and slightly prefer closer distance too.
+            float score = dot * 10f - distance * 0.25f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestTarget = candidate;
+            }
+        }
+
+        return bestTarget;
     }
 
     private Vector2 ApplyPassInaccuracy(Vector2 idealDirection, float passingStat)
