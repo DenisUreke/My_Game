@@ -27,6 +27,9 @@ public class PlayerMovement2D : MonoBehaviour
     private bool passRequested;
     private bool switchPlayerRequested;
 
+    private bool hasAiTarget;
+    private Vector2 aiTargetPosition;
+
     public Vector2 FacingDirection => facingDirection;
     public Vector2 MoveInput => moveInput;
     public Vector2 CurrentVelocity => currentVelocity;
@@ -58,6 +61,17 @@ public class PlayerMovement2D : MonoBehaviour
                 facingDirection = moveInput.normalized;
             }
         }
+    }
+
+    public void SetAiTarget(Vector2 target)
+    {
+        aiTargetPosition = target;
+        hasAiTarget = true;
+    }
+
+    public void ClearAiTarget()
+    {
+        hasAiTarget = false;
     }
 
     private void OnMove(InputValue value)
@@ -141,6 +155,20 @@ public class PlayerMovement2D : MonoBehaviour
             if (moveInput.sqrMagnitude > 0.01f)
             {
                 facingDirection = moveInput.normalized;
+            }
+        }
+        else if (hasAiTarget)
+        {
+            Vector2 toTarget = aiTargetPosition - rb.position;
+
+            if (toTarget.magnitude > 0.05f)
+            {
+                moveInput = toTarget.normalized;
+                facingDirection = moveInput;
+            }
+            else
+            {
+                moveInput = Vector2.zero;
             }
         }
         else

@@ -1003,7 +1003,7 @@ MonoBehaviour:
   looseBallForce: 2.5
   shootForce: 50
   recaptureCooldown: 0.2
-  passForce: 30
+  passForce: 40
   maxPassMissAngle: 15
   passTargetMaxAngle: 40
   passTargetMaxDistance: 10
@@ -1276,7 +1276,7 @@ Camera:
   far clip plane: 1000
   field of view: 34
   orthographic: 1
-  orthographic size: 8
+  orthographic size: 12
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -1638,6 +1638,60 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -14.84, y: 10.1517, z: 0}
   m_LocalScale: {x: 0.6326826, y: 30.23881, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1330155431
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1330155433}
+  - component: {fileID: 1330155432}
+  m_Layer: 0
+  m_Name: TeammateSupportManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1330155432
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1330155431}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5a57fc443c92af4f932be56f5bce62a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TeammateSupportManager
+  playerControlManager: {fileID: 2070014449}
+  ballController: {fileID: 475198148}
+  pitchBounds: {fileID: 1977004067}
+  leftSupportOffset: {x: -8, y: 8}
+  rightSupportOffset: {x: 8, y: 8}
+  offsetRangeX: 2
+  offsetRangeY: 2
+  minOffsetChangeInterval: 1.5
+  maxOffsetChangeInterval: 3
+  offsetLerpSpeed: 2
+--- !u!4 &1330155433
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1330155431}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -8.30223, y: 12.96179, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -2315,7 +2369,7 @@ MonoBehaviour:
   maxX: 8
   minY: -4
   maxY: 24
-  margin: 0.5
+  margin: 2
 --- !u!4 &1977004068
 Transform:
   m_ObjectHideFlags: 0
@@ -2401,3 +2455,4 @@ SceneRoots:
   - {fileID: 2070014450}
   - {fileID: 1977004068}
   - {fileID: 493960267}
+  - {fileID: 1330155433}
