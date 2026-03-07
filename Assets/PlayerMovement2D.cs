@@ -148,6 +148,7 @@ public class PlayerMovement2D : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // Determine movement input based on control state
         if (isControlled)
         {
             moveInput = rawMoveInput;
@@ -157,12 +158,15 @@ public class PlayerMovement2D : MonoBehaviour
                 facingDirection = moveInput.normalized;
             }
         }
+        // If not controlled but has an AI target, move towards it
         else if (hasAiTarget)
         {
             Vector2 toTarget = aiTargetPosition - rb.position;
 
+            // If the target is far enough, move towards it. Otherwise, stop.
             if (toTarget.magnitude > 0.05f)
             {
+                // Move towards the target
                 moveInput = toTarget.normalized;
                 facingDirection = moveInput;
             }
@@ -176,15 +180,17 @@ public class PlayerMovement2D : MonoBehaviour
             moveInput = Vector2.zero;
         }
 
+        // Calculate target velocity based on input and max speed
         Vector2 targetVelocity = moveInput * maxSpeed;
         float rate = moveInput.sqrMagnitude > 0.01f ? acceleration : deceleration;
 
+        // Smoothly move current velocity towards target velocity
         currentVelocity = Vector2.MoveTowards(
             currentVelocity,
             targetVelocity,
             rate * Time.fixedDeltaTime
         );
-
+        // Apply the velocity to the Rigidbody2D
         rb.MovePosition(rb.position + currentVelocity * Time.fixedDeltaTime);
     }
 }
