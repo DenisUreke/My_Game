@@ -1,3 +1,6 @@
+
+
+using Unity.Profiling;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -19,9 +22,10 @@ public class BallController : MonoBehaviour
 
     [Header("Shooting")]
     [SerializeField] private float shootForce = 10f;
-    [SerializeField] private float recaptureCooldown = 0.2f;
+    [SerializeField] private float recaptureCooldown = 0.1f;
 
     [Header("Passing")]
+    [SerializeField] private float acceptedPassAngle = 45f;
     [SerializeField] private float passForce = 8f;
     [SerializeField] private float maxPassMissAngle = 25f;
 
@@ -33,8 +37,8 @@ public class BallController : MonoBehaviour
     [SerializeField] private PlayerControlManager controlManager;
 
     private Rigidbody2D rb;
-    private Transform currentOwner;
-    private PlayerMovement2D currentOwnerMovement;
+    private Transform currentOwner; // used by AI
+    private PlayerMovement2D ballCarrier;
     private float recaptureTimer;
 
     private float currentControlOffset;
@@ -118,26 +122,26 @@ public class BallController : MonoBehaviour
     private void CaptureBall(Transform owner)
     {
         currentOwner = owner;
-        currentOwnerMovement = owner.GetComponent<PlayerMovement2D>();
+        ballCarrier = owner.GetComponent<PlayerMovement2D>();
         currentState = BallState.Controlled;
 
         rb.linearVelocity = Vector2.zero;
         rb.angularVelocity = 0f;
         rb.simulated = false;
 
-        if (currentOwnerMovement != null)
+        if (ballCarrier != null)
         {
-            Vector2 moveInput = currentOwnerMovement.MoveInput;
+            Vector2 moveInput = ballCarrier.MoveInput;
 
             if (moveInput.sqrMagnitude > 0.01f)
                 lastMoveDirection = moveInput.normalized;
             else
-                lastMoveDirection = currentOwnerMovement.FacingDirection.normalized;
+                lastMoveDirection = ballCarrier.FacingDirection.normalized;
 
             if (controlManager != null &&
-                controlManager.CurrentControlledPlayer != currentOwnerMovement)
+                controlManager.CurrentControlledPlayer != ballCarrier)
             {
-                controlManager.SetControlledPlayer(currentOwnerMovement);
+                controlManager.SetControlledPlayer(ballCarrier);
             }
         }
 
@@ -147,11 +151,11 @@ public class BallController : MonoBehaviour
 
     private void UpdateControlledBallPosition()
     {
-        if (currentOwner == null || currentOwnerMovement == null)
+        if (currentOwner == null || ballCarrier == null)
             return;
 
-        Vector2 moveInput = currentOwnerMovement.MoveInput;
-        Vector2 facingDirection = currentOwnerMovement.FacingDirection;
+        Vector2 moveInput = ballCarrier.MoveInput;
+        Vector2 facingDirection = ballCarrier.FacingDirection;
 
         float moveAmount = moveInput.magnitude;
         float movementExtraOffset = moveAmount * maxExtraOffsetFromMovement;
@@ -180,16 +184,16 @@ public class BallController : MonoBehaviour
 
     private void CheckForTurnLoss()
     {
-        if (currentOwner == null || currentOwnerMovement == null)
+        if (currentOwner == null || ballCarrier == null)
             return;
 
-        Vector2 moveInput = currentOwnerMovement.MoveInput;
+        Vector2 moveInput = ballCarrier.MoveInput;
 
         if (moveInput.sqrMagnitude < 0.01f)
             return;
 
         Vector2 currentMoveDirection = moveInput.normalized;
-        float currentSpeed = currentOwnerMovement.CurrentVelocity.magnitude;
+        float currentSpeed = ballCarrier.CurrentVelocity.magnitude;
 
         if (!turnCheckReady)
         {
@@ -202,8 +206,8 @@ public class BallController : MonoBehaviour
 
         if (currentSpeed >= minimumSpeedForTurnCheck && turnDot <= sharpTurnDotThreshold)
         {
-            float dribbling = currentOwnerMovement.dribbling;
-            float maxSpeed = currentOwnerMovement.maxSpeed;
+            float dribbling = ballCarrier.dribbling;
+            float maxSpeed = ballCarrier.maxSpeed;
 
             float speedFactor = maxSpeed > 0f ? currentSpeed / maxSpeed : 0f;
             float turnSeverity = Mathf.InverseLerp(-0.7f, -1f, turnDot);
@@ -223,7 +227,7 @@ public class BallController : MonoBehaviour
     private void LoseControlFromBadTurn(Vector2 previousDirection)
     {
         currentOwner = null;
-        currentOwnerMovement = null;
+        ballCarrier = null;
         currentState = BallState.Free;
 
         rb.simulated = true;
@@ -235,10 +239,10 @@ public class BallController : MonoBehaviour
 
     private void CheckForShoot()
     {
-        if (currentOwnerMovement == null)
+        if (ballCarrier == null)
             return;
 
-        if (currentOwnerMovement.ConsumeShootRequest())
+        if (ballCarrier.ConsumeShootRequest())
         {
             ShootBall();
         }
@@ -246,13 +250,13 @@ public class BallController : MonoBehaviour
 
     private void ShootBall()
     {
-        if (currentOwnerMovement == null)
+        if (ballCarrier == null)
             return;
 
-        Vector2 shootDirection = currentOwnerMovement.FacingDirection.normalized;
+        Vector2 shootDirection = ballCarrier.FacingDirection.normalized;
 
         currentOwner = null;
-        currentOwnerMovement = null;
+        ballCarrier = null;
         currentState = BallState.Free;
 
         rb.simulated = true;
@@ -264,10 +268,10 @@ public class BallController : MonoBehaviour
 
     private void CheckForPass()
     {
-        if (currentOwnerMovement == null)
+        if (ballCarrier == null)
             return;
 
-        if (currentOwnerMovement.ConsumePassRequest())
+        if (ballCarrier.ConsumePassRequest())
         {
             PassBall();
         }
@@ -275,25 +279,29 @@ public class BallController : MonoBehaviour
 
     private void PassBall()
     {
-        if (currentOwnerMovement == null)
+        if (ballCarrier == null)
+        {
             return;
+        }
 
-        Vector2 facingDirection = currentOwnerMovement.FacingDirection.normalized;
-        PlayerMovement2D targetPlayer = FindBestPassTarget(facingDirection);
+        Vector2 facingDirection = ballCarrier.FacingDirection.normalized;
+        PlayerMovement2D passTarget = GetIntendedPassTarget(facingDirection);
 
         Vector2 passDirection;
 
-        if (targetPlayer != null)
-        {
-            passDirection = ((Vector2)targetPlayer.transform.position - (Vector2)transform.position).normalized;
+        if (passTarget == null)
+        { 
+        passDirection = facingDirection;
         }
         else
         {
-            passDirection = facingDirection;
+            passDirection = ((Vector2)passTarget.transform.position - (Vector2)transform.position).normalized;
         }
 
-        Vector2 finalDirection = ApplyPassInaccuracy(passDirection, currentOwnerMovement.passing);
-        ReleaseBall(finalDirection * passForce);
+        //Vector2 finalDirection = ApplyPassInaccuracy(passDirection, ballCarrier.passing);
+
+        ReleaseBall(passDirection * passForce);
+
     }
 
     private PlayerMovement2D FindBestPassTarget(Vector2 facingDirection)
@@ -303,14 +311,14 @@ public class BallController : MonoBehaviour
 
         PlayerMovement2D[] players = controlManager.ControllablePlayers;
 
-        if (players == null || players.Length == 0 || currentOwnerMovement == null)
+        if (players == null || players.Length == 0 || ballCarrier == null)
             return null;
 
         PlayerMovement2D bestTarget = null;
         float bestScore = -999f;
 
         float maxDotOffset = Mathf.Cos(passTargetMaxAngle * Mathf.Deg2Rad);
-        Vector2 origin = currentOwnerMovement.transform.position;
+        Vector2 origin = ballCarrier.transform.position;
 
         for (int i = 0; i < players.Length; i++)
         {
@@ -319,7 +327,7 @@ public class BallController : MonoBehaviour
             if (candidate == null)
                 continue;
 
-            if (candidate == currentOwnerMovement)
+            if (candidate == ballCarrier)
                 continue;
 
             Vector2 toCandidate = (Vector2)candidate.transform.position - origin;
@@ -369,7 +377,7 @@ public class BallController : MonoBehaviour
     private void ReleaseBall(Vector2 velocity)
     {
         currentOwner = null;
-        currentOwnerMovement = null;
+        ballCarrier = null;
         currentState = BallState.Free;
 
         rb.simulated = true;
@@ -377,5 +385,42 @@ public class BallController : MonoBehaviour
 
         recaptureTimer = recaptureCooldown;
         turnCheckReady = false;
+    }
+
+    //###################################################################################
+
+    PlayerMovement2D GetIntendedPassTarget(Vector2 facingDirection)
+    {
+        PlayerMovement2D[] players = controlManager.ControllablePlayers;
+
+        if (players == null || players.Length == 0 || ballCarrier == null)
+            return null;
+
+        PlayerMovement2D bestTarget = null;
+        float shortestDistance = float.MaxValue;
+
+        foreach (PlayerMovement2D p in players)
+        {
+            if (p == null || p == ballCarrier)
+                continue;
+
+            Vector2 toCandidate = (Vector2)p.transform.position - (Vector2)ballCarrier.transform.position;
+            Vector2 directionToCandidate = toCandidate.normalized;
+
+            float angle = Vector2.Angle(facingDirection, directionToCandidate);
+
+            if (angle <= acceptedPassAngle)
+            {
+                float distance = toCandidate.magnitude;
+
+                if (distance < shortestDistance)
+                {
+                    shortestDistance = distance;
+                    bestTarget = p;
+                }
+            }
+        }
+
+        return bestTarget;
     }
 }
